@@ -1,0 +1,23 @@
+.venv/
+__pycache__/
+*.pyc
+dist/
+
+# Local game data, credentials, backups, and machine-specific settings.
+**/WTF/
+**/SavedVariables/
+.env
+.env.*
+.ssh/
+.aws/
+.vscode/
+.idea/
+credentials.*
+secrets.*
+*.local
+*.log
+*.bak
+*.bundle
+*.zip
+*.7z
+Thumbs.db
