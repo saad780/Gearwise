@@ -1,51 +1,29 @@
-# Gearwise
+# Gearwise for WoW Forever
 
-A quiet gear comparison addon for **WoW: Forever**, interface 16001.
+Gearwise compares equipment for your selected build. Green up arrows and red down arrows appear at the top right of item icons in bags (including Bagnon) and quest rewards. Equipment your character cannot currently wear gets a red shade.
 
-- Small **green up arrows** and **red down arrows** on bag items and quest reward icons.
-- A compact tooltip with the active build, the equipped item being replaced, and up to six stat gains/losses.
-- Automatic class and talent-tree detection for all nine classes; **29 build profiles**, including explicit Bear and Shaman Tank choices.
-- Leveling priorities below level 60 give health and recovery extra value. A manual build override supports gearing for another role.
-- Blizzard bags, combined bags, and the locally installed Bagnon/BagBrother button layout.
-- Per-character settings; no startup announcements, sounds, automatic equipping, or quest reward selection.
+A gold coin at the bottom left marks the quest reward choice worth the most at a vendor, including the reward quantity. It waits for all sale prices to load and ignores guaranteed rewards. The coin stays visible alongside upgrade/downgrade arrows at the top right, including when the same item is both an upgrade and the best sale.
 
-## Use
+Newly obtained upgrades open a compact, movable comparison window showing the current item, replacement, and expected item stat gains and losses. A two-handed weapon comparison includes both displaced weapons. The larger **Equip upgrade** button equips into the displayed slot; **Keep current** dismisses it. Hover either item for its tooltip. Prompts wait until combat ends and recheck your gear before equipping. The game's binding confirmation still applies.
 
-Restart WoW after installing the new addon. Open **Esc → Options → AddOns → Gearwise**, or type **`/gw`**.
+The first login or reload records your existing inventory without prompting for it. Sorting bags or swapping gear does not count as obtaining an item. Use `/gw upgrades` to review upgrades already in your bags.
 
-| Command | Action |
-|---|---|
-| `/gw` or `/gearwise` | Open the small settings panel |
-| `/gw status` | Show the detected build and leveling mode |
-| `/gw spec auto` | Follow your talents |
-| `/gw spec` | List your class's available builds |
-| `/gw spec bear` | Example manual build override for a Druid |
-| `/gw arrows on` / `/gw arrows off` | Toggle bag and quest arrows |
-| `/gw tooltip on` / `/gw tooltip off` | Toggle the tooltip comparison |
+Small improvements count too: an otherwise identical 10-armor chest upgrades an 8-armor chest. `/gw upgrades` refreshes item data and reports upgrades found, comparisons still loading, or why there are no upgrades.
 
-Set the build to **Automatic (talents)** for normal use. Before talents are spent, Gearwise uses a class-appropriate leveling default. Feral talent detection defaults to Cat; select Bear explicitly when gearing to tank. Shaman Tank is also an explicit override. Standard mode applies automatically at level 60, and both modes can be selected manually.
+Skinning Knife is treated as a profession tool, so it receives no combat gear arrows, unusable tint, or equip recommendation.
 
-An equal stat score gets no arrow. Items above your level, unusable armor/weapon types, and unmet red class/profession requirements get a tooltip explanation. Uncached items wait for data before displaying arrows.
+Leveling caster/healer builds value melee weapon DPS below level 20. Weapon changes use precise API DPS, or calculate DPS from damage and speed when the API value is missing; rounding is applied only to the final displayed change. For example, Worn Mace to Forsaken Maul shows +0.8 Weapon DPS even though the individual tooltips round to 1.1 and 1.8 DPS.
 
-## How comparisons work
+- `/gw` opens settings.
+- `/gw spec <build>` or `/gw spec auto` chooses a build.
+- `/gw arrows on|off` controls bag and quest arrows.
+- `/gw unusable on|off` controls red equipment shading.
+- `/gw popups on|off` controls upgrade prompts.
+- `/gw tooltip on|off` controls tooltip comparisons.
+- `/gw debug` reports visible item comparison states and the latest item-data errors.
 
-Gearwise uses independent, inspectable stat weights in `Gearwise/Profiles.lua`. These are leveling-oriented heuristics, not simulated damage or healing. A percentage is the change in the **compared item/weapon-set stat score**, not a percentage increase to your character's damage.
+Scores and changes estimate item stats, not final character-sheet totals, simulated damage, special effects, or set bonuses. Wearable items unsuited to the selected build are not marked as physically unusable.
 
-Rings and trinkets use the best valid replacement slot. Unique-equipped restrictions are checked against the remaining equipment. Two-handed weapons account for both occupied hands; off-hand weapon DPS receives its off-hand multiplier. Hunters value ranged weapon DPS, and Feral builds value weapon attributes and feral attack power rather than white weapon DPS. Young Druids and leveling casters' wands are handled separately.
+Copy the addon files and `Media` folder to `World of Warcraft/_classic_beta_/Interface/AddOns/Gearwise/`, then type `/reload` in game. This version targets interface 16001. Automated checks use Lua 5.1 with a simulated game API; final appearance and protected equip behavior require in-game verification.
 
-The item reader combines the client's stat API with item tooltip text, preserves complete random-suffix/enchant links, and avoids counting duplicate unified hit/crit aliases. Healing items receive Forever's one-third damage conversion. Blizzard documents Forever's unified hit/crit and healing changes in the [official deep-dive recap](https://news.blizzard.com/en-us/article/24303313/world-of-warcraft-forever-deep-dive-panel-recap).
-
-Special effects, set bonuses, rotations, racial bonuses, hit caps, and unusual talent-dependent stat conversions are outside this small scorer. Items with proc/use/set effects receive a short **stat estimate** note. English tooltip-only bonus parsing supplements the locale-independent stat API. This is a practical leveling helper; keep situational and special-effect items when they suit how you play.
-
-The source and artwork are original to this addon. Existing addons' files and saved variables are not required or modified. Turn off another gear-judging addon's tooltip/arrows if you want a single comparison block.
-
-## Development
-
-Install Python packages `lupa` and `pillow`, then run:
-
-```powershell
-python tools/build_icons.py
-python tests/run_tests.py
-```
-
-The Lua 5.1 tests load the complete TOC and drive class/spec detection, all build profiles, comparisons, item loading, restriction handling, and bag/quest/tooltip integrations. In-game validation is still needed on the running Forever client.
+From this repository, copy the contents of `Gearwise/` into the game's add-on folder. Run `python tests/run_tests.py` to check comparisons, bag and reward markers, acquisition prompts, and equip handling (requires `lupa` and `pillow`).

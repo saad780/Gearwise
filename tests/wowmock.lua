@@ -60,6 +60,21 @@ function Region:GetOwner() return self.owner end
 function Region:GetID() return self.id or 0 end
 function Region:SetID(id) self.id = id end
 function Region:SetSize(w, h) self.w, self.h = w, h end
+function Region:SetAllPoints(frame) self.allPoints = frame end
+function Region:GetFrameLevel() return self.frameLevel or 1 end
+function Region:SetFrameLevel(level) self.frameLevel = level end
+function Region:ClearAllPoints() self.points = {} end
+function Region:SetColorTexture(...) self.color = { ... } end
+function Region:SetFrameStrata(strata) self.strata = strata end
+function Region:SetClampedToScreen() end
+function Region:SetMovable() end
+function Region:EnableMouse() end
+function Region:RegisterForDrag() end
+function Region:StartMoving() end
+function Region:StopMovingOrSizing() end
+function Region:SetBackdrop() end
+function Region:SetBackdropColor() end
+function Region:SetBackdropBorderColor() end
 function Region:SetWidth(w) self.w = w end
 function Region:SetPoint(...) self.points[#self.points + 1] = { ... } end
 function Region:SetText(text) self.text = text end
@@ -131,6 +146,7 @@ function QuestInfo_ShowRewards() end
 function ContainerFrame_Update() end
 ContainerFrameItemButtonMixin = { Update = function() end }
 C_Container = {}
+function C_Container.GetContainerNumSlots(bag) return #(mock.bags[bag] or {}) end
 function C_Container.GetContainerItemLink(bag, slot) return mock.bags[bag] and mock.bags[bag][slot] end
 C_Item = {}
 function C_Item.GetItemInfo(link)

@@ -50,7 +50,8 @@ function Options:Init()
 	Dropdown("Stat priorities", -196, "mode", function()
 		return { { "auto", "Automatic (leveling below 60)" }, { "leveling", "Leveling" }, { "standard", "Standard" } }
 	end)
-	for index, option in ipairs({ { "bags", "Arrows on bag items" }, { "quests", "Arrows on quest rewards" },
+	for index, option in ipairs({ { "bags", "Arrows on bag items" }, { "quests", "Quest reward arrows and best-value coin" },
+		{ "unusable", "Shade equipment I cannot wear red" }, { "popups", "Prompt when I obtain an upgrade" },
 		{ "tooltips", "Compact item tooltip comparison" } }) do
 		local key, label = option[1], option[2]
 		local check = CreateFrame("CheckButton", nil, panel, "UICheckButtonTemplate")
@@ -61,7 +62,7 @@ function Options:Init()
 		check:SetScript("OnShow", function(button) button:SetChecked(ns.db[key]) end)
 		check:SetScript("OnClick", function(button) ns:SetOption(key, button:GetChecked()) end)
 	end
-	local note = Text("Leveling gives health and recovery more value. Use a manual build when gearing for a different role.\n\nScores estimate useful item stats; special effects, set bonuses and exact damage rotations need your judgment.", 20, -402)
+	local note = Text("Leveling gives health and recovery more value. Use a manual build when gearing for a different role.\n\nScores estimate useful item stats; special effects, set bonuses and exact damage rotations need your judgment.\n\n/gw upgrades reviews upgrades already in your bags.", 20, -464)
 	note:SetWidth(560)
 	note:SetJustifyH("LEFT")
 	note:SetTextColor(0.65, 0.69, 0.74)
@@ -95,6 +96,24 @@ function Options:Init()
 			ns:Invalidate(false)
 		elseif command == "tooltip" and (argument == "on" or argument == "off") then
 			ns:SetOption("tooltips", argument == "on")
+		elseif (command == "popups" or command == "unusable") and (argument == "on" or argument == "off") then
+			ns:SetOption(command, argument == "on")
+		elseif command == "upgrades" then
+			if ns.db.popups then ns.Upgrades:Review() else ns.Print("Enable upgrade popups with /gw popups on.") end
+		elseif command == "debug" then
+			local counts = {}
+			for button, kind in pairs(ns.Display.buttons) do
+				if button:IsVisible() then
+					local ok, link = pcall(ns.Display.Link, ns.Display, button, kind)
+					local status = ok and link and ns.Compare:Get(link).status or "no item link"
+					counts[status] = (counts[status] or 0) + 1
+				end
+			end
+			local rows = {}
+			for status, count in pairs(counts) do rows[#rows + 1] = status .. "=" .. count end
+			ns.Print("Visible tracked items: " .. (#rows > 0 and table.concat(rows, ", ") or "none"))
+			if ns.Items.lastError then ns.Print("Item data: " .. ns.Items.lastError) end
+			if ns.Compare.lastError then ns.Print("Comparison: " .. ns.Compare.lastError) end
 		else self:Open() end
 	end
 end

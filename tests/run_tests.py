@@ -1,5 +1,6 @@
 """Load the addon as the game does, then test its decisions and UI integration."""
 from pathlib import Path
+import subprocess
 import sys
 from lupa.lua51 import LuaRuntime
 from PIL import Image
@@ -30,7 +31,9 @@ def main():
     for path in (ROOT / "Gearwise").glob("*.lua"):
         assert not path.read_bytes().startswith(b"\xef\xbb\xbf"), f"Unexpected BOM: {path}"
     print("TOC, Lua 5.1 loading, transparent TGA textures, and source encoding verified.")
-    return bool(failures)
+    if failures:
+        return True
+    return subprocess.run([sys.executable, str(ROOT / "tests" / "run.py")]).returncode != 0
 
 
 if __name__ == "__main__":

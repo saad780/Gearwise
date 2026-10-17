@@ -42,7 +42,6 @@ function Compare:CanEquip(item, profile)
 		for _, id in ipairs(weaponTypes[profile.class] or {}) do if id == item.subclassID then allowed = true end end
 		if not allowed then return false, "Weapon type unavailable to your class" end
 	end
-	if profile.shield and item.loc == "INVTYPE_2HWEAPON" then return false, "This build uses a shield" end
 	-- Class/profession restrictions and untrained weapon skills are also reflected
 	-- in the item's red requirement lines, read from the client's tooltip.
 	return true
@@ -121,10 +120,14 @@ function Compare:Evaluate(link)
 	if not profile then return { status = "unsupported", reason = "Class data unavailable" } end
 	local item, status = ns.Items:Get(link)
 	if not item then return { status = status or "pending" } end
+	if item.tool then return { status = "irrelevant", reason = "Profession tool", item = item } end
 	if not slots[item.loc] and not hands[item.loc] then return { status = "irrelevant" } end
 	if item.loc == "INVTYPE_BODY" or item.loc == "INVTYPE_TABARD" then return { status = "irrelevant" } end
 	local allowed, reason = self:CanEquip(item, profile)
 	if not allowed then return { status = "unusable", reason = reason, item = item } end
+	if profile.shield and item.loc == "INVTYPE_2HWEAPON" then
+		return { status = "unsupported", reason = "This build uses a shield", item = item }
+	end
 	local targets = hands[item.loc] and { 16, 17 } or slots[item.loc]
 	local equipped = {}
 	for _, slot in ipairs(targets) do
@@ -181,11 +184,16 @@ function Compare:Evaluate(link)
 				for key, value in pairs(oldStats) do if newStats[key] == nil then changes[key] = -value end end
 				local effects = item.effects or (ns.Number(item.setID) and item.setID > 0)
 				local oldLinks = {}
-				for _, old in pairs(alternative.old) do
-					oldLinks[#oldLinks + 1] = old.link
-					effects = effects or old.effects or (ns.Number(old.setID) and old.setID > 0)
+				for oldSlot = 1, 19 do
+					local old = alternative.old[oldSlot]
+					if old then
+						oldLinks[#oldLinks + 1] = old.link
+						effects = effects or old.effects or (ns.Number(old.setID) and old.setID > 0)
+					end
 				end
-				local threshold = math.max(0.05, oldScore * 0.001)
+				-- Armor has a small score weight, especially for casters. A real
+				-- +1/+2 armor gain still counts; ignore only floating-point noise.
+				local threshold = math.max(0.000001, math.abs(oldScore) * 0.000000001)
 				best = { status = delta > threshold and "upgrade" or (delta < -threshold and "downgrade" or "equal"),
 					item = item, slot = alternative.slot, delta = delta, oldScore = oldScore, newScore = newScore,
 					percent = oldScore > 0 and delta / oldScore * 100 or nil, changes = changes,
@@ -201,5 +209,6 @@ end
 function Compare:Get(link)
 	if not ns.Text(link) then return { status = "irrelevant" } end
 	local ok, result = pcall(self.Evaluate, self, link)
+	if not ok then self.lastError = tostring(result) end
 	return ok and result or { status = "pending" }
 end

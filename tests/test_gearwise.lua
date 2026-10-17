@@ -10,6 +10,7 @@ local function Reset(class, spec, level)
 	mock.class, mock.level, mock.talents = class or "MAGE", level or 25, { 0, 0, 0 }
 	mock.dualWield, mock.quest, mock.questLog, mock.combat = false, nil, nil, false
 	ns.db.spec, ns.db.mode, ns.db.bags, ns.db.quests, ns.db.tooltips = spec or "auto", "auto", true, true, true
+	ns.db.popups = false -- Acquisition prompts have their own scenarios.lua suite.
 	ns.Items:Clear(); ns.Compare:Clear(); wipe(ns.Display.buttons)
 	ns.profile = ns.Profiles:Detect()
 	GameTooltip.owner = nil
@@ -211,7 +212,7 @@ test("untrained dual wield and shield builds do not get invalid weapon recommend
 	eq(ns.Compare:Get(offhand).status, "unusable")
 	Reset("WARRIOR", "protection")
 	local twohand = Weapon(50, "INVTYPE_2HWEAPON", 8)
-	eq(ns.Compare:Get(twohand).status, "unusable")
+	eq(ns.Compare:Get(twohand).status, "unsupported", "wearable but unsuited to a shield build")
 end)
 
 test("hunter ranged DPS matters while melee weapons are evaluated as stat sticks", function()
@@ -235,11 +236,12 @@ test("feral weapons use stats, not white weapon DPS; early druids still value me
 	eq(ns.profile.meleeDPS, nil, "Bear Form does not use weapon DPS")
 end)
 
-test("wands have meaningful leveling value without giving casters melee DPS recommendations", function()
+test("wands have meaningful leveling value and caster melee DPS priorities end at level 20", function()
 	Reset("PRIEST", "shadow", 15)
 	mock.equipped[18] = Weapon(5, "INVTYPE_RANGEDRIGHT", 19)
 	local wand = Weapon(10, "INVTYPE_RANGEDRIGHT", 19)
 	eq(ns.Compare:Get(wand).status, "upgrade")
+	Reset("PRIEST", "shadow", 20)
 	mock.equipped[16] = Weapon(5, "INVTYPE_2HWEAPON", 10, { ITEM_MOD_INTELLECT_SHORT = 5 })
 	local staff = Weapon(50, "INVTYPE_2HWEAPON", 10, { ITEM_MOD_INTELLECT_SHORT = 1 })
 	eq(ns.Compare:Get(staff).status, "downgrade")
@@ -290,12 +292,12 @@ test("an equipped slot whose link is still loading is not treated as empty", fun
 	eq(ns.Compare:Get(item).status, "pending")
 end)
 
-test("missing stats or tooltip data also wait, and secret values never crash the engine", function()
+test("missing API stats use tooltip data; missing tooltips wait and secret values never crash", function()
 	Reset()
-	for _, options in ipairs({ { missingStats = true }, { missingTooltip = true } }) do
-		local item = Item({ ITEM_MOD_INTELLECT_SHORT = 10 }, options)
-		eq(ns.Compare:Get(item).status, "pending")
-	end
+	local fallback = Item({}, { missingStats = true, lines = { "+10 Intellect" } })
+	eq(ns.Compare:Get(fallback).status, "upgrade", "readable tooltip supplies missing API stats")
+	local missing = Item({ ITEM_MOD_INTELLECT_SHORT = 10 }, { missingTooltip = true })
+	eq(ns.Compare:Get(missing).status, "pending")
 	local secret = { secret = true }
 	local item = Item({ ITEM_MOD_INTELLECT_SHORT = secret }, { lines = { { leftText = secret } } })
 	assert(ns.Compare:Get(item))

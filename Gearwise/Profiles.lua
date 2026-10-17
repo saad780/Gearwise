@@ -134,6 +134,11 @@ function Profiles:Detect()
 		profile.meleeDPS = 10 -- Before Bear Form, the weapon is used directly.
 		profile.weights.int = 0.6
 	end
+	if profile.leveling and level < 20 and not profile.meleeDPS and not profile.feral then
+		-- Early caster/healer characters still use their melee weapons. A plain
+		-- mace upgrade must not tie just because the eventual build is a caster.
+		profile.meleeDPS = level < 10 and 8 or 2
+	end
 	profile.weights.health = (profile.weights.sta or 0) / 10
 	profile.weights.mana = (profile.weights.int or 0) / 15
 	profile.weights.hp5 = profile.leveling and 1 or 0.2

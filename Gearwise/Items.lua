@@ -2,6 +2,10 @@ local _, ns = ...
 local Items = { cache = {}, requested = {} }
 ns.Items = Items
 
+local professionTools = {
+	[7005] = true, -- Skinning Knife
+}
+
 local aliases = {
 	ITEM_MOD_STRENGTH_SHORT = "str", ITEM_MOD_AGILITY_SHORT = "agi", ITEM_MOD_STAMINA_SHORT = "sta",
 	ITEM_MOD_INTELLECT_SHORT = "int", ITEM_MOD_SPIRIT_SHORT = "spi", ITEM_MOD_HEALTH_SHORT = "health",
@@ -12,6 +16,8 @@ local aliases = {
 	ITEM_MOD_ARMOR_SHORT = "armor", RESISTANCE0_NAME = "armor", ITEM_MOD_EXTRA_ARMOR_SHORT = "bonusArmor",
 	ITEM_MOD_ARMOR_MODIFIER_SHORT = "bonusArmor",
 	ITEM_MOD_DAMAGE_PER_SECOND_SHORT = "dps", ITEM_MOD_BLOCK_VALUE_SHORT = "blockValue",
+	RESISTANCE1_NAME = "holyResist", RESISTANCE2_NAME = "fireResist", RESISTANCE3_NAME = "natureResist",
+	RESISTANCE4_NAME = "frostResist", RESISTANCE5_NAME = "shadowResist", RESISTANCE6_NAME = "arcaneResist",
 	ITEM_MOD_DEFENSE_SKILL_RATING_SHORT = "defense", ITEM_MOD_CRIT_RATING_SHORT = "critRating",
 	ITEM_MOD_CRIT_MELEE_RATING_SHORT = "critRating", ITEM_MOD_CRIT_RANGED_RATING_SHORT = "critRating",
 	ITEM_MOD_CRIT_SPELL_RATING_SHORT = "critRating", ITEM_MOD_SPELL_CRIT_RATING_SHORT = "critRating",
@@ -32,6 +38,7 @@ local names = { strength = "str", agility = "agi", stamina = "sta", intellect = 
 	["healing spells"] = "heal", armor = "armor", health = "health", mana = "mana" }
 for _, school in ipairs({ "fire", "frost", "shadow", "nature", "arcane", "holy" }) do
 	names[school .. " damage"], names[school .. " spell damage"] = school, school
+	names[school .. " resistance"] = school .. "Resist"
 end
 for key, stat in pairs(aliases) do
 	local localized = _G[key]
@@ -55,6 +62,11 @@ local function ParseLine(text, out, item)
 		or line:match("^%(%d+%) set") then item.effects = true; return end
 	local dps = tonumber(line:match("%(([%d%.]+) damage per second%)"))
 	if dps then out.dps = dps; return end
+	local low, high = line:match("^([%d%.]+)%s*%-%s*([%d%.]+)%s+damage$")
+	if low and high then
+		item.minDamage, item.maxDamage = tonumber(low), tonumber(high)
+		return
+	end
 	local amount, name = line:match("^%+?([%d%.]+)%s+(.+)$")
 	if amount and names[name] then Add(out, names[name], tonumber(amount)); return end
 	local all = tonumber(line:match("^%+(%d+) all stats$"))
@@ -113,6 +125,43 @@ function Items:Request(id)
 	end
 end
 
+local function Restriction(text, color, item, requirement)
+	if not ns.Text(text) or not color then return end
+	local r, g = color.r, color.g
+	if color.GetRGB then r, g = color:GetRGB() end
+	if not ns.Number(r) or not ns.Number(g) or r < 0.8 or g > 0.3 then return end
+	local line = Clean(text)
+	-- The right side contains weapon/armor proficiency; red names and flavor
+	-- text are not requirements. Requirements can appear on either side.
+	if requirement or line:match("^requires ") or line:match("^classes:") or line:match("^races:") then
+		item.restriction = text
+	end
+end
+
+function Items:TooltipLines(link)
+	if C_TooltipInfo and C_TooltipInfo.GetHyperlink then
+		local data = C_TooltipInfo.GetHyperlink(link)
+		return data and data.lines
+	end
+	if not self.scanner then
+		self.scanner = CreateFrame("GameTooltip", "GearwiseScannerTooltip", UIParent, "GameTooltipTemplate")
+	end
+	local tip = self.scanner
+	tip:SetOwner(UIParent, "ANCHOR_NONE")
+	tip:ClearLines()
+	tip:SetHyperlink(link)
+	local lines = {}
+	for index = 1, tip:NumLines() do
+		local left, right = _G["GearwiseScannerTooltipTextLeft" .. index], _G["GearwiseScannerTooltipTextRight" .. index]
+		local lr, lg, lb = left:GetTextColor()
+		local rr, rg, rb = right:GetTextColor()
+		lines[index] = { leftText = left:GetText(), rightText = right:GetText(),
+			leftColor = { r = lr, g = lg, b = lb }, rightColor = { r = rr, g = rg, b = rb } }
+	end
+	tip:Hide()
+	return lines
+end
+
 function Items:Read(link)
 	if not ns.Text(link) then return nil, "pending" end
 	if self.cache[link] then return self.cache[link] end
@@ -123,11 +172,19 @@ function Items:Read(link)
 	local info = { getInfo(link) }
 	if not ns.Text(info[1]) then self:Request(id); return nil, "pending" end
 	local item = { id = id, link = link, name = info[1], level = info[5] or 0, loc = info[9],
-		classID = info[12], subclassID = info[13], setID = info[16], stats = {} }
+		classID = info[12], subclassID = info[13], setID = info[16], icon = info[10],
+		tool = professionTools[id] or info[9] == "INVTYPE_PROFESSION_TOOL", stats = {} }
+	if item.classID == nil or item.subclassID == nil then
+		local instant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
+		if instant then
+			local _, _, _, _, _, classID, subclassID = instant(link)
+			item.classID, item.subclassID = classID, subclassID
+		end
+	end
 	if not ns.Text(item.loc) then return nil, "irrelevant" end
 	local getStats = C_Item and C_Item.GetItemStats or GetItemStats
-	local raw = getStats and getStats(link)
-	if type(raw) ~= "table" then self:Request(id); return nil, "pending" end
+	local raw = getStats and getStats(link) or {}
+	if type(raw) ~= "table" then raw = {} end
 	for key, value in pairs(raw) do
 		if ns.Text(key) and ns.Number(value) then
 			local stat = aliases[key]
@@ -144,24 +201,33 @@ function Items:Read(link)
 		end
 	end
 	local parsed = {}
-	if C_TooltipInfo and C_TooltipInfo.GetHyperlink then
-		local ok, data = pcall(C_TooltipInfo.GetHyperlink, link)
-		if not ok or type(data) ~= "table" or type(data.lines) ~= "table" or #data.lines == 0 then
+	do
+		local ok, lines = pcall(self.TooltipLines, self, link)
+		if not ok or type(lines) ~= "table" or #lines == 0 then
+			if not ok then self.lastError = tostring(lines) end
 			self:Request(id)
 			return nil, "pending"
 		end
-		for _, line in ipairs(data.lines) do
-			local color, text = line.leftColor, ns.Text(line.leftText)
-			if color and text and ns.Number(color.r) and ns.Number(color.g) and color.r > 0.8 and color.g < 0.3 then
-				local lower = text:lower()
-				if lower:match("^requires ") or lower:match("^classes:") then item.restriction = text end
-			end
+		for index, line in ipairs(lines) do
+			Restriction(line.leftText, line.leftColor, item)
+			Restriction(line.rightText, line.rightColor, item, index > 1 and ns.Text(line.leftText)
+				and Clean(line.leftText):match("^%+?[%d%.]+%s") == nil)
 			ParseLine(line.leftText, parsed, item)
 			-- Weapon speed is on the right; all actual stats are on the left.
 			if ns.Text(line.rightText) then item.speed = tonumber(line.rightText:match("[Ss]peed%s+([%d%.]+)")) or item.speed end
 		end
 	end
-	for key, value in pairs(parsed) do item.stats[key] = math.max(item.stats[key] or 0, value) end
+	for key, value in pairs(parsed) do
+		-- Tooltip DPS is rounded (e.g. 1.1), while the API can return the exact
+		-- 1.0526316. Taking the larger value corrupts differences between weapons.
+		if key ~= "dps" then item.stats[key] = math.max(item.stats[key] or 0, value) end
+	end
+	if not item.stats.dps then
+		if item.classID == 2 and ns.Number(item.minDamage) and ns.Number(item.maxDamage)
+			and ns.Number(item.speed) and item.speed > 0 then
+			item.stats.dps = (item.minDamage + item.maxDamage) / (2 * item.speed)
+		else item.stats.dps = parsed.dps end
+	end
 	-- Forever combines these chances. A tooltip percentage is authoritative;
 	-- API aliases must not score the same bonus again as a rating.
 	for _, key in ipairs({ "crit", "hit", "dodge", "parry", "block" }) do
@@ -177,6 +243,6 @@ end
 
 function Items:Get(link)
 	local ok, item, status = pcall(self.Read, self, link)
-	if not ok then return nil, "pending" end
+	if not ok then self.lastError = tostring(item); return nil, "pending" end
 	return item, status
 end
