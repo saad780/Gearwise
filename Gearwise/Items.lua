@@ -3,6 +3,9 @@ local Items = { cache = {}, requested = {} }
 ns.Items = Items
 
 local professionTools = {
+	[2901] = true, -- Mining Pick
+	[5956] = true, -- Blacksmith Hammer
+	[6219] = true, -- Arclight Spanner
 	[7005] = true, -- Skinning Knife
 }
 
@@ -173,7 +176,7 @@ function Items:Read(link)
 	if not ns.Text(info[1]) then self:Request(id); return nil, "pending" end
 	local item = { id = id, link = link, name = info[1], level = info[5] or 0, loc = info[9],
 		classID = info[12], subclassID = info[13], setID = info[16], icon = info[10],
-		tool = professionTools[id] or info[9] == "INVTYPE_PROFESSION_TOOL", stats = {} }
+		stats = {} }
 	if item.classID == nil or item.subclassID == nil then
 		local instant = C_Item and C_Item.GetItemInfoInstant or GetItemInfoInstant
 		if instant then
@@ -181,6 +184,13 @@ function Items:Read(link)
 			item.classID, item.subclassID = classID, subclassID
 		end
 	end
+	-- Forever still classifies picks, hammers, spanners and chisels as generic
+	-- weapons (14), and fishing poles as weapons (20). They are utility items,
+	-- not combat gear the character lacks proficiency for. Resolve this after
+	-- the instant-info fallback so localized names and new tool IDs work too.
+	item.tool = professionTools[id] or item.loc == "INVTYPE_PROFESSION_TOOL"
+		or item.loc == "INVTYPE_PROFESSION_GEAR" or item.classID == 19
+		or (item.classID == 2 and (item.subclassID == 14 or item.subclassID == 20))
 	if not ns.Text(item.loc) then return nil, "irrelevant" end
 	local getStats = C_Item and C_Item.GetItemStats or GetItemStats
 	local raw = getStats and getStats(link) or {}

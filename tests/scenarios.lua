@@ -437,6 +437,55 @@ Test('Skinning Knife has no red shade, combat arrow, or equip recommendation', f
 	assert(not ns.Display.shades[bagButton] or not ns.Display.shades[bagButton]:IsShown())
 end)
 
+Test('profession and utility tools have no red tint or combat recommendations for any class', function()
+	local tools = {
+		{6256, 'INVTYPE_2HWEAPON', 2, 20}, -- Fishing Pole
+		{6367, 'INVTYPE_2HWEAPON', 2, 20}, -- Big Iron Fishing Pole
+		{2901, 'INVTYPE_WEAPONMAINHAND', 2, 14}, -- Mining Pick
+		{5956, 'INVTYPE_WEAPONMAINHAND', 2, 14}, -- Blacksmith Hammer
+		{6219, 'INVTYPE_WEAPONMAINHAND', 2, 14}, -- Arclight Spanner
+		{271965, 'INVTYPE_WEAPONMAINHAND', 2, 14}, -- Forever Jewelcrafting Chisel
+		{999010, 'INVTYPE_PROFESSION_GEAR', 19, 0},
+		{999011, 'INVTYPE_PROFESSION_TOOL', 2, 0},
+	}
+	local originalClass = UnitClass
+	for _, class in ipairs({'WARRIOR', 'PALADIN', 'HUNTER', 'ROGUE', 'PRIEST', 'SHAMAN', 'MAGE', 'WARLOCK', 'DRUID'}) do
+		UnitClass = function() return class, class end
+		ns:Invalidate(true); Flush()
+		for _, tool in ipairs(tools) do
+			local link = AddItem(tool[1], {ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 999}, tool[2], tool[3], tool[4], {
+				name = 'Localized utility item', level = 99,
+				lines = {{leftText = 'Localized utility item'}, {leftText = 'Requires skill', leftColor = {r = 1, g = 0, b = 0}}},
+			})
+			inventory[0][1] = link
+			assert(ns.Compare:Get(link).status == 'irrelevant', class .. ' evaluated tool ' .. tool[1] .. ' as combat gear')
+			ns.Display:Update()
+			assert(not ns.Display.arrows[bagButton]:IsShown())
+			assert(not ns.Display.shades[bagButton] or not ns.Display.shades[bagButton]:IsShown())
+			SlashCmdList.GEARWISE('upgrades'); Flush()
+			assert(not ns.Upgrades.current, 'Tool generated an upgrade prompt')
+		end
+	end
+	UnitClass = originalClass
+	inventory[0][1] = plate; ns:Invalidate(true); Flush(); ns.Display:Update()
+	assert(ns.Display.shades[bagButton]:IsShown(), 'Unusable combat gear must still be red')
+	inventory[0][1] = 'item:2901'; ns.Display:Update()
+	assert(not ns.Display.shades[bagButton]:IsShown(), 'Reused bag slot must clear the old red tint')
+end)
+
+Test('profession detection uses fallback metadata before evaluating a tool', function()
+	local link = AddItem(999012, {}, 'INVTYPE_2HWEAPON', 2, 20)
+	local originalInfo, originalInstant = C_Item.GetItemInfo, C_Item.GetItemInfoInstant
+	C_Item.GetItemInfo = function(itemLink)
+		local info = {originalInfo(itemLink)}
+		if itemLink == link then info[12], info[13] = nil, nil end
+		return unpack(info, 1, 13)
+	end
+	C_Item.GetItemInfoInstant = function() return 999012, '', '', 'INVTYPE_2HWEAPON', 0, 2, 20 end
+	assert(ns.Compare:Get(link).status == 'irrelevant', 'Fishing pole metadata fallback must suppress red shading')
+	C_Item.GetItemInfo, C_Item.GetItemInfoInstant = originalInfo, originalInstant
+end)
+
 Test('screenshot: level-5 Shadow Priest gets an upgrade arrow and +0.8 DPS for Forsaken Maul', function()
 	UnitClass = function() return 'Priest', 'PRIEST' end
 	UnitLevel = function() return 5 end

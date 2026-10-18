@@ -10,7 +10,7 @@ The first login or reload records your existing inventory without prompting for 
 
 Small improvements count too: an otherwise identical 10-armor chest upgrades an 8-armor chest. `/gw upgrades` refreshes item data and reports upgrades found, comparisons still loading, or why there are no upgrades.
 
-Skinning Knife is treated as a profession tool, so it receives no combat gear arrows, unusable tint, or equip recommendation.
+Profession and utility tools, including fishing poles, mining picks, skinning knives, blacksmith hammers, spanners and chisels, receive no combat gear arrows, red unusable tint, or equip recommendation. Detection uses item categories rather than localized names.
 
 Leveling caster/healer builds value melee weapon DPS below level 20. Weapon changes use precise API DPS, or calculate DPS from damage and speed when the API value is missing; rounding is applied only to the final displayed change. For example, Worn Mace to Forsaken Maul shows +0.8 Weapon DPS even though the individual tooltips round to 1.1 and 1.8 DPS.
 
